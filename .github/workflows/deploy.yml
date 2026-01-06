@@ -36,10 +36,16 @@ jobs:
     - name: Build, tag, and push image to Amazon ECR
       id: build-image
       env:
-        ECR_REGISTRY: ${{ steps.login-ecr.registry }}
+        # Changed 'steps.login-ecr.registry' to 'steps.login-ecr.outputs.registry'
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         IMAGE_TAG: ${{ github.sha }}
       run: |
-        # Build  the docker container and push it to ECR
+        # If the registry is empty, stop the script immediately with a helpful message
+        if [ -z "$ECR_REGISTRY" ]; then
+          echo "Error: ECR_REGISTRY is empty. Check your AWS credentials and ECR permissions."
+          exit 1
+        fi
+        
         docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
         docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
         echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
