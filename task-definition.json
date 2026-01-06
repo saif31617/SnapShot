@@ -1,10 +1,11 @@
 {
     "family": "react-app-task",
     "networkMode": "awsvpc",
+    "executionRoleArn": "arn:aws:iam::123456789012:role/ecsTaskExecutionRole",
     "containerDefinitions": [
         {
             "name": "react-container",
-            "image": "<ACCOUNT_ID>.dkr.ecr.<REGION>.amazonaws.com/react-app-repo:latest",
+            "image": "678878256416.dkr.ecr.us-east-1.amazonaws.com/saifullah-ecr:cf6372f2f376588b297697794bbf43f3a2db9edc",
             "essential": true,
             "portMappings": [
                 {
