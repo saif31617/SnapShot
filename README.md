@@ -1,55 +1,169 @@
-# Snap Shot [![Tweet](https://img.shields.io/twitter/url/http/shields.io.svg?style=social)](https://twitter.com/intent/tweet?text=See%20this%20react%20example&url=https://yog9.github.io/SnapShot/&hashtags=react,context-api,freecodecamp,developers)
 
-[![Build Status](https://travis-ci.org/Yog9/SnapShot.svg?branch=master)](https://travis-ci.org/Yog9/SnapShot)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![HitCount](http://hits.dwyl.com/Yog9/SnapShot.svg)](http://hits.dwyl.com/Yog9/SnapShot)
+### Step 1: Set up the AWS Infrastructure Foundations
 
-[Demo of Snap Shot](https://yog9.github.io/SnapShot/)
+### Step 1.1 : Create a repository named something
+You need to create three specific resources in your AWS Console (or via CLI) to prepare for the GitHub connection:
 
-![](/snapscout.png)
+Create an ECR (Elastic Container Registry) Repository: GitHub Actions will build your React app into a Docker image. It needs a private place to "push" that image.
 
-### Summary
+Action: Create a repository named something like my-react-app.
 
-Snap Shot is a gallery created using React,React Hooks, React Router and Context API. The Routes were setup for four default pages and a search page. Also the images were displayed using the Flickr API and axios to fetch data.
+### Step 1.2 : Create an IAM User for GitHub Actions: GitHub needs permission to talk to your AWS account.
 
-### Motivation
+Action: Create a user (e.g., github-action-user) and give it Programmatic Access.
 
-The purpose of this project was to get familiar with React Hooks and Context API.
+Permissions: For now, attach policies for AmazonEC2ContainerRegistryFullAccess and AmazonECS_FullAccess.
 
-### Getting Started
+Crucial: Save the Access Key ID and Secret Access Key.
 
-Click the demo link or clone/download the repository on your local machine.
-Create a config.js file in api folder inside src folders. In config.js file write
-`export const apiKey = "YOUR_FLIKR_API_KEY";`
+### Step 1.3 :  Store Credentials in GitHub Secrets:
 
-##### Install dependencies
+Go to your forked repo on GitHub.
 
-`yarn install`
+Navigate to Settings > Secrets and variables > Actions.
 
-##### Run Snap Shot from the root directory.
+Add two secrets: AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY
 
-`yarn start`
+### Step 2 : Create the Dockerfile 
 
-### Built With
+### Step 2.1: Create a .dockerignore
 
-- React js
-- React Router
-- React Hooks
-- Context API
-- Flickr API
+To keep your image small and fast, create another file named .dockerignore in the same root directory. This prevents bulky, unnecessary files from being sent to the build
 
-### Features
+node_modules
+build
+.git
+.github
+Dockerfile
+.dockerignore
 
-**1. Responsive Design.**
 
-**2. Search functionality added to search photos from API.**
+Now that your code is "container-ready" with the Dockerfile, the next step is to set up the infrastructure on AWS where the container will actually run.
 
-### Coming Soon
+### Step 3 : infrastructure for contianer management
 
-- [ ] Cypress E2E Tests
+### Step 3.1 : Create Create the ECS Cluster
 
-### Contributing
+Open the ECS Console: In your AWS Console, search for Elastic Container Service.
 
-Everyone is welcomed to contribute to this project. You can contribute either by submitting bugs or suggesting improvements by opening an issue on GitHub. Please see the [CONTRIBUTING](CONTRIBUTING.md) guidelines for more information.
+Create Cluster: Click the Create cluster button.
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+Cluster Configuration:
+
+Cluster name: Give it a name like react-app-cluster.
+
+Infrastructure: Select AWS Fargate (serverless).
+
+Why Fargate? It is the easiest way to start because you don't have to manage actual EC2 servers; AWS handles the underlying hardware for you.
+
+Monitoring & Tags: You can leave these as default.
+
+Finish: Click Create.
+
+### Step 3.2 : Create the task definition file 
+
+Create in git repository task-definition.json
+
+{
+    "family": "react-app-task",
+    "networkMode": "awsvpc",
+    "executionRoleArn": "arn:aws:iam::678878256416:role/saifullah-ecsTaskExecutionRole",
+    "containerDefinitions": [
+        {
+            "name": "react-container",
+            "image": "678878256416.dkr.ecr.us-east-1.amazonaws.com/saifullah-ecr:cf6372f2f376588b297697794bbf43f3a2db9edc",
+            "essential": true,
+            "portMappings": [
+                {
+                    "containerPort": 80,
+                    "hostPort": 80,
+                    "protocol": "tcp"
+                }
+            ]
+        }
+    ],
+    "requiresCompatibilities": [
+        "FARGATE"
+    ],
+    "cpu": "256",
+    "memory": "512"
+}
+
+
+
+### Step 4 : Prepare the GitHub Workflow File
+
+Now we create the "brain" of the operation. This file will detect your code push, build the image, and tell ECS to update.
+
+In your project, create a folder path: .github/workflows/
+
+Inside that folder, create a file named deploy.yml.
+
+
+
+
+### Step 5: Fix the Task Execution Role
+
+We need to create a role in AWS and then tell your task-definition.json to use it.
+
+### 5.1 : Create the Role  ecsTaskExecutionRole
+
+Go to IAM > Roles > Create role.
+
+Select AWS Service and choose Elastic Container Service.
+
+Select Elastic Container Service Task as the use case.
+
+Attach the policy: AmazonECSTaskExecutionRolePolicy.
+
+Name it: ecsTaskExecutionRole.
+
+Copy the ARN (it looks like arn:aws:iam::123456789012:role/ecsTaskExecutionRole)
+
+### 5.2 Get the Role ARN Update your task-definition.json
+Once created, click on the name ecsTaskExecutionRole in the list. Copy the ARN. It will look like this: arn:aws:iam::123456789012:role/ecsTaskExecutionRole
+
+
+Now, go to your laptop and update your task-definition.json file. You must add the executionRoleArn at the top level of the JSON.
+
+### 6 Create the ECS Service via Console
+
+Start Service Creation:
+
+Find the Services tab and click the Create button.
+
+Deployment Configuration:
+
+Compute options: Keep the default Capacity provider strategy.
+
+Application type: Select Service.
+
+Task definition:
+
+Family: Select the task definition name you registered (e.g., react-app-task).
+
+Revision: Choose the latest one (e.g., 1 (LATEST)).
+
+Service name: Type react-web-service (this must match the name in your deploy.yml exactly).
+
+Desired tasks: Set this to 1.
+
+Networking (Critical Step):
+
+VPC: Select your Default VPC.
+
+Subnets: Select at least two subnets (e.g., us-east-1a and us-east-1b) to ensure availability.
+
+Security group: Select Create a new security group.
+
+Name: react-sg.
+
+Inbound Rules: Add a rule for HTTP on Port 80 with Source 0.0.0.0/0 (Anywhere) so you can access the website in your browser.
+
+Public IP: Ensure this is set to Turned on.
+
+Finish:
+
+Leave all other settings (like Load Balancing) as default for now.
+
+Scroll to the bottom and click Create.
